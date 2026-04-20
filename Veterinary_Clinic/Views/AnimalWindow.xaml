@@ -1,0 +1,57 @@
+﻿<Window x:Class="Veterinary_Clinic.AnimalWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Veterinary_Clinic" xmlns:xctk="http://schemas.xceed.com/wpf/xaml/toolkit"
+        mc:Ignorable="d"
+        Title="Животное"
+        Height="445"
+        Width="420"
+        WindowStartupLocation="CenterScreen"
+        Background="#F4F6F9" MinWidth="420" MinHeight="445">
+
+    <Border Margin="15"
+            Padding="15"
+            Background="White"
+            CornerRadius="10">
+
+        <StackPanel>
+
+            <TextBlock Text="🐾 Данные животного"
+                       FontSize="18"
+                       FontWeight="Bold"
+                       Margin="0,0,0,15"/>
+
+            <TextBlock Text="Имя"/>
+            <TextBox x:Name="NameBox"/>
+
+            <TextBlock Text="Вид"/>
+            <TextBox x:Name="SpeciesBox"/>
+
+            <TextBlock Text="Дата рождения"/>
+            <DatePicker x:Name="AgeBox"/>
+
+            <TextBlock Text="Владелец"/>
+            <ComboBox x:Name="OwnerBox"
+                      DisplayMemberPath="FullName"
+                      SelectedValuePath="Id"/>
+
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Margin="0,20,0,0">
+
+                <Button Content="Сохранить"
+                        Width="110"
+                        Click="Save_Click"/>
+
+                <Button Content="Отмена"
+                        Width="110"
+                        Click="Cancel_Click"/>
+
+            </StackPanel>
+
+        </StackPanel>
+
+    </Border>
+</Window>

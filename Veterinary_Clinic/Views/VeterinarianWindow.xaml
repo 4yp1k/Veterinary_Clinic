@@ -1,0 +1,41 @@
+﻿<Window x:Class="Veterinary_Clinic.VeterinarianWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Veterinary_Clinic"
+        mc:Ignorable="d"
+        Title="Ветеринар"
+        Height="325"
+        Width="400"
+        WindowStartupLocation="CenterScreen"
+        Background="#F4F6F9" MinWidth="400" MinHeight="325">
+
+    <Border Margin="15" Padding="15" Background="White" CornerRadius="10">
+
+        <StackPanel>
+
+            <TextBlock Text="👨‍⚕ Ветеринар"
+                       FontSize="18"
+                       FontWeight="Bold"
+                       Margin="0,0,0,15"/>
+
+            <TextBlock Text="ФИО"/>
+            <TextBox x:Name="FullNameBox"/>
+
+            <TextBlock Text="Специализация"/>
+            <TextBox x:Name="SpecialtyBox"/>
+
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Margin="0,20,0,0">
+
+                <Button Content="Сохранить" Click="Save_Click"/>
+                <Button Content="Отмена" Click="Cancel_Click"/>
+
+            </StackPanel>
+
+        </StackPanel>
+
+    </Border>
+</Window>

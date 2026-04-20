@@ -1,0 +1,52 @@
+﻿<Window x:Class="Veterinary_Clinic.TreatmentWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Veterinary_Clinic"
+        mc:Ignorable="d"
+        Title="Лечение"
+        Height="485"
+        Width="420"
+        WindowStartupLocation="CenterScreen"
+        Background="#F4F6F9" MinWidth="420" MinHeight="485">
+
+    <Border Margin="15" Padding="15" Background="White" CornerRadius="10">
+
+        <StackPanel>
+
+            <TextBlock Text="💊 Лечение"
+                       FontSize="18"
+                       FontWeight="Bold"
+                       Margin="0,0,0,15"/>
+
+            <TextBlock Text="Приём:" Grid.Row="0"/>
+            <ComboBox x:Name="AppointmentComboBox"
+                  DisplayMemberPath="DisplayInfo"
+                  SelectedValuePath="Id"/>
+
+            <TextBlock Text="Диагноз"/>
+            <TextBox x:Name="DiagnosisBox"/>
+
+            <TextBlock Text="План лечения"/>
+            <TextBox x:Name="TreatmentBox"
+                     AcceptsReturn="True"
+                     Height="80"/>
+
+            <TextBlock Text="Стоимость"/>
+            <TextBox x:Name="CostBox"
+                AcceptsReturn="True" PreviewTextInput="OnlyNumbers"/>
+
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Margin="0,20,0,0">
+
+                <Button Content="Сохранить" Width="110" Click="Save_Click"/>
+                <Button Content="Отмена" Width="110" Click="Cancel_Click"/>
+
+            </StackPanel>
+
+        </StackPanel>
+
+    </Border>
+</Window>

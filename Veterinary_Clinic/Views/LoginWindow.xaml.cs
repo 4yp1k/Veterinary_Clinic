@@ -29,33 +29,15 @@ namespace Veterinary_Clinic.Views
 
         private void Login_Click(object sender, RoutedEventArgs e)
         {
-            var conn = RepositoryHelper.GetConnection();
-            conn.Open();
+            var userRepo = new UserRepository();
+            var user = userRepo.Authenticate(UsernameBox.Text, PasswordBox.Password);
 
-            var cmd = new SqlCommand(@"
-        SELECT Id, Username, Role
-        FROM Users
-        WHERE Username=@u AND Password=@p", conn);
-
-            cmd.Parameters.AddWithValue("@u", UsernameBox.Text);
-            cmd.Parameters.AddWithValue("@p", PasswordBox.Password);
-
-            var reader = cmd.ExecuteReader();
-
-            if (reader.Read())
+            if (user != null)
             {
-                var role = reader["Role"].ToString();
-
-                if (role != "Admin")
-                {
-                    MessageBox.Show("Нет доступа администратора");
-                    return;
-                }
-
                 Session.CurrentUser = new User
                 {
-                    Id = (int)reader["Id"],
-                    Username = reader["Username"].ToString(),
+                    Id = user.Id,
+                    Username = user.Username,
                     Role = UserRole.Admin
                 };
 

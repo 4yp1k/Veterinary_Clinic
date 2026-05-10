@@ -1,6 +1,8 @@
-﻿using System;
+﻿using OfficeOpenXml;
+using System;
 using System.Collections.Generic;
 using System.Data.SqlClient;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -10,101 +12,154 @@ namespace Veterinary_Clinic.Data
 {
     public class AppointmentRepository : IRepository<Appointment>
     {
-        public void Add(Appointment app)
+        private readonly string _filePath = "../../Excel/Appointments.xlsx";
+
+        public AppointmentRepository()
         {
-            var conn = RepositoryHelper.GetConnection();
-            conn.Open();
-
-            var cmd = new SqlCommand(@"
-        INSERT INTO Appointments (AnimalId, VeterinarianId, VisitDate, Complaint)
-        VALUES (@a,@v,@d,@c)", conn);
-
-            cmd.Parameters.AddWithValue("@a", app.Animal.Id);
-            cmd.Parameters.AddWithValue("@v", app.Doctor.Id);
-            cmd.Parameters.AddWithValue("@d", app.VisitDate);
-            cmd.Parameters.AddWithValue("@c", app.Complaint);
-
-            cmd.ExecuteNonQuery();
+            EnsureFileAndSheetExist();
         }
 
-        public void Update(Appointment app)
+        private void EnsureFileAndSheetExist()
         {
-            var conn = RepositoryHelper.GetConnection();
-            conn.Open();
-
-            var cmd = new SqlCommand(@"
-        UPDATE Appointments
-        SET AnimalId = @a,
-            VeterinarianId = @v,
-            VisitDate = @d,
-            Complaint = @c
-        WHERE Id = @id", conn);
-
-            cmd.Parameters.AddWithValue("@a", app.Animal.Id);
-            cmd.Parameters.AddWithValue("@v", app.Doctor.Id);
-            cmd.Parameters.AddWithValue("@d", app.VisitDate);
-            cmd.Parameters.AddWithValue("@c", app.Complaint);
-            cmd.Parameters.AddWithValue("@id", app.Id);
-
-            cmd.ExecuteNonQuery();
-        }
-
-        public void Delete(int id)
-        {
-            var conn = RepositoryHelper.GetConnection();
-            conn.Open();
-
-            var cmd = new SqlCommand("DELETE FROM Appointments WHERE Id = @id", conn);
-            cmd.Parameters.AddWithValue("@id", id);
-
-            cmd.ExecuteNonQuery();
+            var fileInfo = new FileInfo(_filePath);
+            if (!fileInfo.Exists)
+            {
+                using (var package = new ExcelPackage(fileInfo))
+                {
+                    var sheet = package.Workbook.Worksheets.Add("Appointments");
+                    sheet.Cells[1, 1].Value = "Id";
+                    sheet.Cells[1, 2].Value = "AnimalId";
+                    sheet.Cells[1, 3].Value = "VeterinarianId";
+                    sheet.Cells[1, 4].Value = "VisitDate";
+                    sheet.Cells[1, 5].Value = "Complaint";
+                    package.Save();
+                }
+            }
+            else
+            {
+                using (var package = new ExcelPackage(fileInfo))
+                {
+                    if (package.Workbook.Worksheets["Appointments"] == null)
+                    {
+                        package.Workbook.Worksheets.Add("Appointments");
+                        package.Save();
+                    }
+                }
+            }
         }
 
         public List<Appointment> GetAll()
         {
             var list = new List<Appointment>();
+            if (!File.Exists(_filePath)) return list;
 
-            var conn = RepositoryHelper.GetConnection();
-            conn.Open();
+            var animalRepo = new AnimalRepository();
+            var animals = animalRepo.GetAll().ToDictionary(a => a.Id, a => a);
+            var vetRepo = new VeterinarianRepository();
+            var vets = vetRepo.GetAll().ToDictionary(v => v.Id, v => v);
 
-            var cmd = new SqlCommand(@"
-        SELECT 
-            ap.Id,
-            ap.VisitDate,
-            ap.Complaint,
-            a.Id AS AnimalId,
-            a.Name AS AnimalName,
-            v.Id AS VetId,
-            v.FullName AS VetName
-        FROM Appointments ap
-        JOIN Animals a ON ap.AnimalId = a.Id
-        JOIN Veterinarians v ON ap.VeterinarianId = v.Id", conn);
-
-            var reader = cmd.ExecuteReader();
-
-            while (reader.Read())
+            using (var package = new ExcelPackage(new FileInfo(_filePath)))
             {
-                list.Add(new Appointment
+                var sheet = package.Workbook.Worksheets["Appointments"];
+                if (sheet?.Dimension == null) return list;
+
+                int rows = sheet.Dimension.Rows;
+                for (int r = 2; r <= rows; r++)
                 {
-                    Id = (int)reader["Id"],
-                    VisitDate = (DateTime)reader["VisitDate"],
-                    Complaint = reader["Complaint"].ToString(),
+                    int animalId = int.TryParse(sheet.Cells[r, 2].Text, out int aid) ? aid : 0;
+                    int vetId = int.TryParse(sheet.Cells[r, 3].Text, out int vid) ? vid : 0;
 
-                    Animal = new Animal
-                    {
-                        Id = (int)reader["AnimalId"],
-                        Name = reader["AnimalName"].ToString()
-                    },
+                    animals.TryGetValue(animalId, out Animal animal);
+                    vets.TryGetValue(vetId, out Veterinarian vet);
 
-                    Doctor = new Veterinarian
+                    list.Add(new Appointment
                     {
-                        Id = (int)reader["VetId"],
-                        FullName = reader["VetName"].ToString()
-                    }
-                });
+                        Id = int.TryParse(sheet.Cells[r, 1].Text, out int id) ? id : 0,
+                        Animal = animal,
+                        Doctor = vet,
+                        VisitDate = DateTime.TryParse(sheet.Cells[r, 4].Text, out DateTime dt) ? dt : DateTime.MinValue,
+                        Complaint = sheet.Cells[r, 5].Text
+                    });
+                }
             }
-
             return list;
+        }
+
+        public void Add(Appointment app)
+        {
+            if (app.Animal == null || app.Doctor == null)
+                throw new ArgumentException("Животное и врач обязательны");
+
+            using (var package = new ExcelPackage(new FileInfo(_filePath)))
+            {
+                var sheet = package.Workbook.Worksheets["Appointments"];
+                int newRow = (sheet.Dimension?.Rows ?? 1) + 1;
+
+                int maxId = 0;
+                if (sheet.Dimension != null)
+                {
+                    for (int r = 2; r < newRow; r++)
+                    {
+                        int id = int.TryParse(sheet.Cells[r, 1].Text, out int val) ? val : 0;
+                        if (id > maxId) maxId = id;
+                    }
+                }
+                app.Id = maxId + 1;
+
+                sheet.Cells[newRow, 1].Value = app.Id;
+                sheet.Cells[newRow, 2].Value = app.Animal.Id;
+                sheet.Cells[newRow, 3].Value = app.Doctor.Id;
+                sheet.Cells[newRow, 4].Value = app.VisitDate.ToString();
+                sheet.Cells[newRow, 5].Value = app.Complaint;
+                package.Save();
+            }
+        }
+
+        public void Update(Appointment app)
+        {
+            using (var package = new ExcelPackage(new FileInfo(_filePath)))
+            {
+                var sheet = package.Workbook.Worksheets["Appointments"];
+                if (sheet?.Dimension == null) return;
+
+                int rows = sheet.Dimension.Rows;
+                for (int r = 2; r <= rows; r++)
+                {
+                    if (int.TryParse(sheet.Cells[r, 1].Text, out int id) && id == app.Id)
+                    {
+                        sheet.Cells[r, 2].Value = app.Animal?.Id;
+                        sheet.Cells[r, 3].Value = app.Doctor?.Id;
+                        sheet.Cells[r, 5].Value = app.Complaint;
+                        package.Save();
+                        return;
+                    }
+                }
+            }
+        }
+
+        public void Delete(int id)
+        {
+            var treatRepo = new TreatmentRepository();
+            var treatments = treatRepo.GetAll().Where(t => t.Appointment?.Id == id).ToList();
+            foreach (var t in treatments)
+                treatRepo.Delete(t.Id);
+
+            using (var package = new ExcelPackage(new FileInfo(_filePath)))
+            {
+                var sheet = package.Workbook.Worksheets["Appointments"];
+                if (sheet?.Dimension == null) return;
+
+                int rows = sheet.Dimension.Rows;
+                for (int r = 2; r <= rows; r++)
+                {
+                    if (int.TryParse(sheet.Cells[r, 1].Text, out int currentId) && currentId == id)
+                    {
+                        sheet.DeleteRow(r);
+                        package.Save();
+                        return;
+                    }
+                }
+            }
         }
     }
 }

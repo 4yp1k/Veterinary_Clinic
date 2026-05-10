@@ -1,6 +1,8 @@
-﻿using System;
+﻿using OfficeOpenXml;
+using System;
 using System.Collections.Generic;
 using System.Data.SqlClient;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -10,128 +12,149 @@ namespace Veterinary_Clinic.Data
 {
     public class TreatmentRepository : IRepository<Treatment>
     {
-        public void Add(Treatment treatment)
+        private readonly string _filePath = "../../Excel/Treatments.xlsx";
+
+        public TreatmentRepository()
         {
-            var conn = RepositoryHelper.GetConnection();
-            conn.Open();
-
-            var cmd = new SqlCommand(@"
-                INSERT INTO Treatments 
-                    (AppointmentId, Diagnosis,TreatmentPlan, DateCreated, Cost)
-                VALUES 
-                    (@AppointmentId, @Diagnosis, @TreatmentPlan, @DateCreated, @Cost);
-                ", conn);
-
-            cmd.Parameters.AddWithValue("@AppointmentId", treatment.Appointment.Id);
-            cmd.Parameters.AddWithValue("@Diagnosis", treatment.Diagnosis ?? "");
-            cmd.Parameters.AddWithValue("@TreatmentPlan", treatment.TreatmentPlan ?? "");
-            cmd.Parameters.AddWithValue("@DateCreated", treatment.DateCreated);
-            cmd.Parameters.AddWithValue("@Cost", treatment.Cost);
-
-            cmd.ExecuteNonQuery();
+            EnsureFileAndSheetExist();
         }
 
-        public void Update(Treatment treatment)
+        private void EnsureFileAndSheetExist()
         {
-            var conn = RepositoryHelper.GetConnection();
-            conn.Open();
-
-            var cmd = new SqlCommand(@"
-                UPDATE Treatments
-                SET 
-                    AppointmentId = @AppointmentId,
-                    Diagnosis = @Diagnosis,
-                    TreatmentPlan = @TreatmentPlan,
-                    Cost = @Cost
-                WHERE Id = @Id;
-                ", conn);
-
-            cmd.Parameters.AddWithValue("@Id", treatment.Id);
-            cmd.Parameters.AddWithValue("@AppointmentId", treatment.Appointment.Id);
-            cmd.Parameters.AddWithValue("@Diagnosis", treatment.Diagnosis ?? "");
-            cmd.Parameters.AddWithValue("@TreatmentPlan", treatment.TreatmentPlan ?? "");
-            cmd.Parameters.AddWithValue("@DateCreated", treatment.DateCreated);
-            cmd.Parameters.AddWithValue("@Cost", treatment.Cost);
-
-            cmd.ExecuteNonQuery();
-        }
-
-        public void Delete(int id)
-        {
-            var conn = RepositoryHelper.GetConnection();
-            conn.Open();
-
-            var cmd = new SqlCommand(@"
-                DELETE FROM Treatments WHERE Id = @Id;", conn);
-
-            cmd.Parameters.AddWithValue("@Id", id);
-
-            cmd.ExecuteNonQuery();
+            var fileInfo = new FileInfo(_filePath);
+            if (!fileInfo.Exists)
+            {
+                using (var package = new ExcelPackage(fileInfo))
+                {
+                    var sheet = package.Workbook.Worksheets.Add("Treatments");
+                    sheet.Cells[1, 1].Value = "Id";
+                    sheet.Cells[1, 2].Value = "AppointmentId";
+                    sheet.Cells[1, 3].Value = "Diagnosis";
+                    sheet.Cells[1, 4].Value = "TreatmentPlan";
+                    sheet.Cells[1, 5].Value = "DateCreated";
+                    sheet.Cells[1, 6].Value = "Cost";
+                    package.Save();
+                }
+            }
+            else
+            {
+                using (var package = new ExcelPackage(fileInfo))
+                {
+                    if (package.Workbook.Worksheets["Treatments"] == null)
+                    {
+                        package.Workbook.Worksheets.Add("Treatments");
+                        package.Save();
+                    }
+                }
+            }
         }
 
         public List<Treatment> GetAll()
         {
             var list = new List<Treatment>();
+            if (!File.Exists(_filePath)) return list;
 
-            var conn = RepositoryHelper.GetConnection();
-            conn.Open();
+            var appointRepo = new AppointmentRepository();
+            var appointments = appointRepo.GetAll().ToDictionary(a => a.Id, a => a);
 
-            var cmd = new SqlCommand(@"
-                SELECT 
-                    t.Id,
-                    t.Diagnosis,
-                    t.TreatmentPlan,
-                    t.DateCreated,
-                    t.Cost,
-
-                    ap.Id AS AppointmentId,
-                    ap.VisitDate,
-
-                    a.Id AS AnimalId,
-                    a.Name AS AnimalName,
-
-                    v.Id AS VetId,
-                    v.FullName AS VetName
-
-                    FROM Treatments t
-                    JOIN Appointments ap ON t.AppointmentId = ap.Id
-                    JOIN Animals a ON ap.AnimalId = a.Id
-                    JOIN Veterinarians v ON ap.VeterinarianId = v.Id
-                    ", conn);
-
-            var reader = cmd.ExecuteReader();
-
-            while (reader.Read())
+            using (var package = new ExcelPackage(new FileInfo(_filePath)))
             {
-                list.Add(new Treatment
+                var sheet = package.Workbook.Worksheets["Treatments"];
+                if (sheet?.Dimension == null) return list;
+
+                int rows = sheet.Dimension.Rows;
+                for (int r = 2; r <= rows; r++)
                 {
-                    Id = (int)reader["Id"],
-                    Diagnosis = reader["Diagnosis"].ToString(),
-                    TreatmentPlan = reader["TreatmentPlan"].ToString(),
-                    DateCreated = (DateTime)reader["DateCreated"],
-                    Cost = (int)(reader["Cost"] == DBNull.Value ? 0 : (decimal)reader["Cost"]),
+                    int appId = int.TryParse(sheet.Cells[r, 2].Text, out int aid) ? aid : 0;
+                    appointments.TryGetValue(appId, out Appointment app);
 
-                    Appointment = new Appointment
+                    list.Add(new Treatment
                     {
-                        Id = (int)reader["AppointmentId"],
-                        VisitDate = (DateTime)reader["VisitDate"],
-
-                        Animal = new Animal
-                        {
-                            Id = (int)reader["AnimalId"],
-                            Name = reader["AnimalName"].ToString()
-                        },
-
-                        Doctor = new Veterinarian
-                        {
-                            Id = (int)reader["VetId"],
-                            FullName = reader["VetName"].ToString()
-                        }
-                    }
-                });
+                        Id = int.TryParse(sheet.Cells[r, 1].Text, out int id) ? id : 0,
+                        Appointment = app,
+                        Diagnosis = sheet.Cells[r, 3].Text,
+                        TreatmentPlan = sheet.Cells[r, 4].Text,
+                        DateCreated = DateTime.TryParse(sheet.Cells[r, 5].Text, out DateTime dc) ? dc : DateTime.MinValue,
+                        Cost = int.TryParse(sheet.Cells[r, 6].Text, out int cost) ? cost : 0
+                    });
+                }
             }
-
             return list;
+        }
+
+        public void Add(Treatment treatment)
+        {
+            if (treatment.Appointment == null)
+                throw new ArgumentException("Приём не указан");
+
+            using (var package = new ExcelPackage(new FileInfo(_filePath)))
+            {
+                var sheet = package.Workbook.Worksheets["Treatments"];
+                int newRow = (sheet.Dimension?.Rows ?? 1) + 1;
+
+                int maxId = 0;
+                if (sheet.Dimension != null)
+                {
+                    for (int r = 2; r < newRow; r++)
+                    {
+                        int id = int.TryParse(sheet.Cells[r, 1].Text, out int val) ? val : 0;
+                        if (id > maxId) maxId = id;
+                    }
+                }
+                treatment.Id = maxId + 1;
+                treatment.DateCreated = DateTime.Now;
+
+                sheet.Cells[newRow, 1].Value = treatment.Id;
+                sheet.Cells[newRow, 2].Value = treatment.Appointment.Id;
+                sheet.Cells[newRow, 3].Value = treatment.Diagnosis;
+                sheet.Cells[newRow, 4].Value = treatment.TreatmentPlan;
+                sheet.Cells[newRow, 5].Value = treatment.DateCreated.ToString();
+                sheet.Cells[newRow, 6].Value = treatment.Cost;
+                package.Save();
+            }
+        }
+
+        public void Update(Treatment treatment)
+        {
+            using (var package = new ExcelPackage(new FileInfo(_filePath)))
+            {
+                var sheet = package.Workbook.Worksheets["Treatments"];
+                if (sheet?.Dimension == null) return;
+
+                int rows = sheet.Dimension.Rows;
+                for (int r = 2; r <= rows; r++)
+                {
+                    if (int.TryParse(sheet.Cells[r, 1].Text, out int id) && id == treatment.Id)
+                    {
+                        sheet.Cells[r, 2].Value = treatment.Appointment?.Id;
+                        sheet.Cells[r, 3].Value = treatment.Diagnosis;
+                        sheet.Cells[r, 4].Value = treatment.TreatmentPlan;
+                        sheet.Cells[r, 6].Value = treatment.Cost;
+                        package.Save();
+                        return;
+                    }
+                }
+            }
+        }
+
+        public void Delete(int id)
+        {
+            using (var package = new ExcelPackage(new FileInfo(_filePath)))
+            {
+                var sheet = package.Workbook.Worksheets["Treatments"];
+                if (sheet?.Dimension == null) return;
+
+                int rows = sheet.Dimension.Rows;
+                for (int r = 2; r <= rows; r++)
+                {
+                    if (int.TryParse(sheet.Cells[r, 1].Text, out int currentId) && currentId == id)
+                    {
+                        sheet.DeleteRow(r);
+                        package.Save();
+                        return;
+                    }
+                }
+            }
         }
     }
 }

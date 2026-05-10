@@ -45,6 +45,7 @@ namespace Veterinary_Clinic
                 DeleteAppointButton.Visibility = Visibility.Collapsed;
                 DeleteTreatButton.Visibility = Visibility.Collapsed;
                 RevenueVetTab.Visibility = Visibility.Collapsed;
+                tabControl.SelectedIndex = 3;
             }
             else
             {
@@ -61,7 +62,7 @@ namespace Veterinary_Clinic
         {
             AnimalsGrid.ItemsSource = animalRepo.GetAll();
             OwnersGrid.ItemsSource = ownerRepo.GetAll();
-            VetsGrid.ItemsSource = vetRepo.GetAll();
+            VetsGrid.ItemsSource = vetRepo.GetActive();
             AppointmentsGrid.ItemsSource = appointRepo.GetAll();
             TreatmentsGrid.ItemsSource = treatRepo.GetAll();
         }
@@ -185,6 +186,8 @@ namespace Veterinary_Clinic
             if (selected == null) return;
 
             var window = new AppointmentWindow(selected);
+
+            window.DatePickerBox.IsEnabled = false;
 
             if (window.ShowDialog() == true)
             {
@@ -334,46 +337,38 @@ namespace Veterinary_Clinic
 
         private void LoadRevenueByVets_Click(object sender, RoutedEventArgs e)
         {
-            var conn = RepositoryHelper.GetConnection();
-            conn.Open();
+            var treatmentRepo = new TreatmentRepository();
+            var treatments = treatmentRepo.GetAll();
 
-            var cmd = new SqlCommand(@"
-                SELECT 
-                CAST(t.DateCreated AS DATE) AS Day,
-                v.FullName AS VetName,
-                SUM(t.Cost) AS Total
-                FROM Treatments t
-                JOIN Appointments a ON t.AppointmentId = a.Id
-                JOIN Veterinarians v ON a.VeterinarianId = v.Id
-                GROUP BY CAST(t.DateCreated AS DATE), v.FullName
-                ORDER BY Day",
-            conn);
-
-            var reader = cmd.ExecuteReader();
-
-            List<RevenueVetItem> list = new List<RevenueVetItem>();
-            decimal totalSum = 0;
-
-            while (reader.Read())
-            {
-                var item = new RevenueVetItem
-                {
-                    Day = (DateTime)reader["Day"],
-                    VetName = reader["VetName"].ToString(),
-                    Total = Convert.ToDecimal(reader["Total"])
-                };
-
-                list.Add(item);
-                totalSum += item.Total;
-            }
-
-            if (list.Count == 0)
+            if (treatments == null || treatments.Count == 0)
             {
                 MessageBox.Show("Нет данных");
                 return;
             }
 
-            RevenueVetGrid.ItemsSource = list;
+            var grouped = treatments
+                .GroupBy(t => new
+                {
+                    Day = t.DateCreated.Date,
+                    VetName = t.Appointment?.Doctor?.FullName ?? "Неизвестно"
+                })
+                .Select(g => new RevenueVetItem
+                {
+                    Day = g.Key.Day,
+                    VetName = g.Key.VetName,
+                    Total = g.Sum(t => (decimal)t.Cost)
+                })
+                .OrderBy(x => x.Day)
+                .ToList();
+
+            if (grouped.Count == 0)
+            {
+                MessageBox.Show("Нет данных для отчёта");
+                return;
+            }
+
+            RevenueVetGrid.ItemsSource = grouped;
+            decimal totalSum = grouped.Sum(x => x.Total);
             TotalText.Text = $"Общая выручка: {totalSum} ₽";
         }
     }

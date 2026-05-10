@@ -30,7 +30,7 @@ namespace Veterinary_Clinic
             InitializeComponent();
 
             AnimalBox.ItemsSource = animalRepo.GetAll();
-            VetBox.ItemsSource = vetRepo.GetAll();
+            VetBox.ItemsSource = vetRepo.GetActive();
 
             if (appt != null)
             {
@@ -72,7 +72,7 @@ namespace Veterinary_Clinic
 
             DateTime visit = DatePickerBox.Value.Value;
 
-            if (IsTimeConflict(vet.Id, visit))
+            if (IsTimeConflict(vet.Id, visit, Appointment?.Id))
             {
                 MessageBox.Show("У врача уже есть приём в это время!");
                 return;
@@ -90,28 +90,27 @@ namespace Veterinary_Clinic
             Close();
         }
 
-        private bool IsTimeConflict(int vetId, DateTime newStart)
+        private bool IsTimeConflict(int vetId, DateTime newStart, int? excludeAppointmentId = null)
         {
             DateTime newEnd = newStart.AddMinutes(30);
 
-            var conn = RepositoryHelper.GetConnection();
-            conn.Open();
+            var appointRepo = new AppointmentRepository();
+            var appointments = appointRepo.GetAll();
 
-            var cmd = new SqlCommand(@"
-                SELECT COUNT(*)
-                FROM Appointments
-                WHERE VeterinarianId = @VetId
-                AND (@NewStart < DATEADD(MINUTE, 30, VisitDate)
-                AND @NewEnd > VisitDate)",
-            conn);
+            foreach (var app in appointments)
+            {
+                if (excludeAppointmentId.HasValue && app.Id == excludeAppointmentId.Value)
+                    continue;
 
-            cmd.Parameters.AddWithValue("@VetId", vetId);
-            cmd.Parameters.AddWithValue("@NewStart", newStart);
-            cmd.Parameters.AddWithValue("@NewEnd", newEnd);
-
-            int count = (int)cmd.ExecuteScalar();
-
-            return count > 0;
+                if (app.Doctor != null && app.Doctor.Id == vetId)
+                {
+                    if (newStart < app.VisitDate.AddMinutes(30) && newEnd > app.VisitDate)
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
         }
 
         private void Cancel_Click(object sender, RoutedEventArgs e)

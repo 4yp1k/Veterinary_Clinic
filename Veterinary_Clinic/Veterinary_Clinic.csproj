@@ -158,7 +158,7 @@
     <Compile Include="Data\UserRepository.cs" />
     <Compile Include="Data\VeterinarianRepository.cs" />
     <Compile Include="Models\IEntity.cs" />
-    <Compile Include="Models\IRepository.cs" />
+    <Compile Include="Data\IRepository.cs" />
     <Compile Include="Models\RevenueVetItem.cs" />
     <Compile Include="Models\Session.cs" />
     <Compile Include="Models\User.cs" />

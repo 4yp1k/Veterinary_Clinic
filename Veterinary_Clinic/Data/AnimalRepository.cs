@@ -53,7 +53,6 @@ namespace Veterinary_Clinic.Data
             var animals = new List<Animal>();
             if (!File.Exists(_filePath)) return animals;
 
-            // Предварительно загружаем всех владельцев
             var ownerRepo = new OwnerRepository();
             var owners = ownerRepo.GetAll();
             var ownerDict = owners.ToDictionary(o => o.Id, o => o);
@@ -137,7 +136,6 @@ namespace Veterinary_Clinic.Data
 
         public void Delete(int id)
         {
-            // При удалении животного также удаляем его приёмы и связанное лечение каскадом (по желанию)
             var appointRepo = new AppointmentRepository();
             var appointments = appointRepo.GetAll().Where(a => a.Animal?.Id == id).ToList();
             foreach (var app in appointments)

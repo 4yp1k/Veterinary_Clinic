@@ -17,7 +17,7 @@ namespace Veterinary_Clinic
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
-            ExcelPackage.License.SetNonCommercialPersonal("Каширин И.Г.");
+            ExcelPackage.License.SetNonCommercialOrganization("Каширин И.Г.");
 
             var userRepo = new UserRepository();
             var users = userRepo.GetAll();

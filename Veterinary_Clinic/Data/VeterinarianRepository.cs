@@ -12,7 +12,8 @@ namespace Veterinary_Clinic.Data
 {
     public class VeterinarianRepository : IRepository<Veterinarian>
     {
-        private readonly string _filePath = "../../Excel/Veterinarians.xlsx";
+        private static readonly string _basePath = AppDomain.CurrentDomain.BaseDirectory;
+        private readonly string _filePath = Path.Combine(_basePath, "Excel", "Veterinarians.xlsx");
 
         public VeterinarianRepository()
         {

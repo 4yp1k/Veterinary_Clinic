@@ -30,9 +30,17 @@ namespace Veterinary_Clinic
 
         public MainWindow()
         {
-            InitializeComponent();
-            ApplyPermissions();
-            RefreshGrids();
+            try
+            {
+                InitializeComponent();
+                ApplyPermissions();
+                RefreshGrids();
+            }
+            catch (Exception)
+            {
+
+                throw;
+            }
         }
 
         private void ApplyPermissions()

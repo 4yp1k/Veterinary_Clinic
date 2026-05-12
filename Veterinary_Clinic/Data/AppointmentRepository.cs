@@ -12,7 +12,8 @@ namespace Veterinary_Clinic.Data
 {
     public class AppointmentRepository : IRepository<Appointment>
     {
-        private readonly string _filePath = "../../Excel/Appointments.xlsx";
+        private static readonly string _basePath = AppDomain.CurrentDomain.BaseDirectory;
+        private readonly string _filePath = Path.Combine(_basePath, "Excel", "Appointments.xlsx");
 
         public AppointmentRepository()
         {
